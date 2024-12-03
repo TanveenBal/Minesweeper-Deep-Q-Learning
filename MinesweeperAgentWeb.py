@@ -1,6 +1,7 @@
 import numpy as np
 import pyautogui as pg
 import pyscreeze as ps
+from collections import deque
 
 EPSILON = 0.01
 
@@ -20,6 +21,7 @@ CONFIDENCES = {
 
 # TILES = {
 #     "U": "unsolved",
+#     "M": "mine",
 #     "0": "0",
 #     "1": "1",
 #     "2": "2",
@@ -49,6 +51,9 @@ TILES = {
     "8": "8",
 }
 
+TILE_WIDTH = 16
+TILE_LENGTH = 16
+
 class MinesweeperAgentWeb(object):
     def __init__(self, model):
         pg.click((10,100)) # click on current tab so "F2" resets the game
@@ -57,8 +62,9 @@ class MinesweeperAgentWeb(object):
         self.mode, self.loc, self.dims = self.get_loc()
         self.nrows, self.ncols = self.dims[0], self.dims[1]
         self.ntiles = self.dims[2]
-        self.board = self.get_board()
-        self.state = self.get_state()
+        self.board = self.state = None
+        self.init_board()
+        self.update_state()
 
         self.epsilon = EPSILON
         self.model = model
@@ -83,10 +89,11 @@ class MinesweeperAgentWeb(object):
         random_index = np.random.choice(len(unsolved_tiles))
 
         # Perform the click action on the selected tile
-        pg.click(self.board[random_index]["coord"])
+        random_coords = self.board[random_index]["coords"]
+        pg.click(random_coords)
 
         # Update the board after the move using the selected row and col
-        self.board =  self.get_board()
+        self.update_board(random_index, random_coords)
 
     def get_loc(self):
         """
@@ -111,6 +118,26 @@ class MinesweeperAgentWeb(object):
                 dims = modes[mode]
 
         return diff, loc, dims
+    
+    def init_board(self):
+        unsorted_tiles = list(pg.locateAllOnScreen(f"pics/unsolved.png", region=self.loc, confidence=CONFIDENCES["unsolved"]))
+
+        tiles = []
+        for coords in unsorted_tiles:
+            tiles.append({"coord": (coords[0], coords[1]), "value": "U"})
+
+        self.board = sorted(tiles, key=lambda x: (x["coord"][1], x["coord"][0]))
+        
+
+    def get_tile(self, coords):
+        for tile_key, tile_name in TILES.items():
+            try:
+                result = list(pg.locateAllOnScreen(f"pics/{tile_name}.png", region=(coords[0]-1, coords[1]-1, TILE_WIDTH+2, TILE_LENGTH+2), confidence=CONFIDENCES[tile_name]))
+                return tile_key
+            except ps.ImageNotFoundException:
+                continue
+        self.done = True
+        return "M"
 
     def get_tiles(self, tile, bbox):
         """
@@ -125,59 +152,70 @@ class MinesweeperAgentWeb(object):
 
         return tiles
 
-    def get_board(self):
+    def update_board(self, action_index, action_coords):
         """
         Gets the state of the board as a dictionary of coordinates and values,
         ordered from left to right, top to bottom
         """
-
-        # all_tiles = [[t, self.get_tiles(TILES[t], self.loc)] for t in TILES]
-
-        # # for speedup; look for higher tiles only if n of lower tiles < total ----
-        # count=0
-        # for value, coords in all_tiles:
-        #     count += len(coords)
-
-        # if count < self.ntiles:
-        #     higher_tiles = [[t, self.get_tiles(TILES2[t], self.loc)] for t in TILES2]
-        #     all_tiles += higher_tiles
-        # # ----
-
-        # tiles = []
-        # for value, coords in all_tiles:
-        #     for coord in coords:
-        #         tiles.append({"coord": (coord[0], coord[1]), "value": value})
-
-        # tiles = sorted(tiles, key=lambda x: (x["coord"][1], x["coord"][0]))
-
         self.check_game_over()
         if self.done:
             return
+        
+        tile_value = self.get_tile(action_coords)
+        self.board[action_index]["value"] = tile_value
 
-        all_tiles = [[tile, self.get_tiles(TILES[tile], self.loc)] for tile in TILES]
+        if tile_value == "0": # Can make this bfs instead of what it does right now, basically bfs until there are unsolveds for effeciency
+            # visited = set()
+            # queue = deque([(action_index // self.ncols, action_index % self.ncols)])
 
-        tiles = []
-        for value, coords in all_tiles:
-            for coord in coords:
-                tiles.append({"coord": (coord[0], coord[1]), "value": value})
+            # directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+            # while queue:
+            #     curr_row, curr_col = queue.popleft()
+            #     index = curr_row * self.ncols + curr_col
 
-        tiles = sorted(tiles, key=lambda x: (x["coord"][1], x["coord"][0]))
+            #     if (curr_row, curr_col) in visited:
+            #         continue
+                
+            #     visited.add((curr_row, curr_col))
 
-        try:
-            i=0
-            for x in range(self.nrows):
-                for y in range(self.ncols):
-                    tiles[i]["index"] = (y, x)
-                    i+=1
+            #     tile_value = self.get_tile((curr_row, curr_col))
+                
+            #     # If the tile is 'a', stop processing this tile and its neighbors
+            #     if tile_value == 'U':
+            #         continue
+                
+            #     # Update the tile value
+            #     self.board[index]["value"] = tile_value
+                
+            #     # Add unvisited neighbors to the queue
+            #     for dr, dc in directions:
+            #         new_row, new_col = curr_row + dr, curr_col + dc
+                    
+            #         # Check if the new coordinates are within bounds
+            #         if 0 <= new_row < self.nrows and 0 <= new_col < self.ncols:
+            #             if (new_row, new_col) not in visited:
+            #                 queue.append((new_row, new_col))
+            for i in range(len(self.board)):
+                self.board[i]["value"] = self.get_tile(self.board[i]["coord"])
 
-        except IndexError:
-            print(len(tiles))
 
-        return tiles
+        self.print_board()
 
-    def get_state(self):
+    def print_board(self):
+        board_2d = []
+        for row in range(self.nrows):
+            cur_row = []
+            for col in range(self.ncols):
+                index = row * self.ncols + col
+                cur_row.append(self.board[index]["value"])
+            board_2d.append(cur_row)
+
+        for row in board_2d:
+            print(" ".join(str(cell) for cell in row))
+
+    def update_state(self):
         """
-        Gets the numeric image representation state of the board.
+        Updates the numeric image representation state of the board.
         This is what will be the input for the DQN.
         """
 
@@ -190,7 +228,7 @@ class MinesweeperAgentWeb(object):
         state_im = state_im.astype(np.int8) / 8
         state_im = state_im.astype(np.float16)
 
-        return state_im
+        self.state = state_im
 
     def get_action(self):
         board = self.state.reshape(1, self.ntiles)
@@ -199,10 +237,11 @@ class MinesweeperAgentWeb(object):
         rand = np.random.random() # random value b/w 0 & 1
 
         if rand < self.epsilon: # random move (explore)
+            print("guessing...")
             move = np.random.choice(unsolved)
         else:
             moves = self.model.predict(np.reshape(self.state, (1, self.nrows, self.ncols, 1)))
-            moves[board!=-0.125] = np.min(moves)
+            moves[board != -0.125] = -np.inf
             move = np.argmax(moves)
 
         return move
@@ -234,14 +273,13 @@ class MinesweeperAgentWeb(object):
         # neighbors = self.get_neighbors(action_index)
 
         self.check_game_over()
-        
-        pg.click(self.board[action_index]["coord"])
-        pg.click((10,100))
+        action_coords = self.board[action_index]["coord"]
+        pg.click(action_coords)
         
 
         if not self.done:
-            self.board = self.get_board()
-            self.state = self.get_state()
+            self.update_board(action_index, action_coords)
+            self.update_state()
 
         return self.state, self.done
 
@@ -264,3 +302,5 @@ class MinesweeperAgentWeb(object):
             pass
 
         self.done = False
+
+

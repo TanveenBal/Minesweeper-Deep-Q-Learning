@@ -31,6 +31,23 @@ def main():
     progress_list, wins_list, ep_rewards = [], [], []
     n_clicks = 0
 
+    # Attempt to load previous model and replay memory
+    try:
+        model_path = f'models/{MODEL_NAME}.keras'
+        replay_path = f'replay/{MODEL_NAME}.pkl'
+
+        if os.path.exists(model_path):
+            agent.model = load_model(model_path)
+            agent.target_model.set_weights(agent.model.get_weights())
+            print(f"Loaded model from {model_path}")
+
+        if os.path.exists(replay_path):
+            with open(replay_path, 'rb') as f:
+                agent.replay_memory = pickle.load(f)
+                print(f"Loaded replay memory from {replay_path}")
+    except Exception as e:
+        print(f"Error loading model or replay memory: {e}")
+
     for episode in tqdm(range(1, params.episodes+1), unit='episode'):
         agent.tensorboard.step = episode
 

@@ -29,7 +29,7 @@ EPSILON_DECAY = 0.99975
 EPSILON_MIN = 0.01
 
 # DQN settings
-CONV_UNITS = 128 # number of neurons in each conv layer
+CONV_UNITS = 64 # number of neurons in each conv layer
 DENSE_UNITS = 512 # number of neurons in fully connected dense layer
 UPDATE_TARGET_EVERY = 5
 
