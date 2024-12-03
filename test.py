@@ -23,6 +23,7 @@ def main():
 
     for _ in tqdm(range(1, params.episodes+1)):
         agent.reset()
+        agent.init_board()
 
         done = False
         while not done:
