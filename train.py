@@ -70,7 +70,7 @@ def main():
 
             n_clicks += 1
 
-        progress_list.append(env.n_progress) # n of non-guess moves
+        progress_list.append(env.n_progress)
         ep_rewards.append(episode_reward)
 
         if env.n_wins > past_n_wins:

@@ -65,6 +65,7 @@ class MinesweeperAgentWeb(object):
         self.board = self.state = None
         self.init_board()
         self.update_state()
+        self.solved = set()
 
         self.epsilon = EPSILON
         self.model = model
@@ -161,43 +162,47 @@ class MinesweeperAgentWeb(object):
         if self.done:
             return
         
-        tile_value = self.get_tile(action_coords)
-        self.board[action_index]["value"] = tile_value
+        if action_index not in self.solved: 
+            tile_value = self.get_tile(action_coords)
+            self.board[action_index]["value"] = tile_value
+            if tile_value.isdigit():
+                self.solved.add(action_index)
+        else:
+            self.print_board()
+            return
 
         if tile_value == "0": # Can make this bfs instead of what it does right now, basically bfs until there are unsolveds for effeciency
             # visited = set()
-            # queue = deque([(action_index // self.ncols, action_index % self.ncols)])
+            # queue = deque([action_coords])
 
             # directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
             # while queue:
             #     curr_row, curr_col = queue.popleft()
             #     index = curr_row * self.ncols + curr_col
 
-            #     if (curr_row, curr_col) in visited:
+            #     if index in visited or index in self.solved:
             #         continue
-                
-            #     visited.add((curr_row, curr_col))
 
+            #     visited.add(index)
             #     tile_value = self.get_tile((curr_row, curr_col))
-                
-            #     # If the tile is 'a', stop processing this tile and its neighbors
-            #     if tile_value == 'U':
-            #         continue
-                
-            #     # Update the tile value
             #     self.board[index]["value"] = tile_value
-                
-            #     # Add unvisited neighbors to the queue
-            #     for dr, dc in directions:
-            #         new_row, new_col = curr_row + dr, curr_col + dc
-                    
-            #         # Check if the new coordinates are within bounds
-            #         if 0 <= new_row < self.nrows and 0 <= new_col < self.ncols:
-            #             if (new_row, new_col) not in visited:
-            #                 queue.append((new_row, new_col))
-            for i in range(len(self.board)):
-                self.board[i]["value"] = self.get_tile(self.board[i]["coord"])
 
+            #     if tile_value.isdigit():
+            #         self.solved.add(index)
+
+            #     # If tile_value is "0", cascade to neighbors
+            #     if tile_value == "0":
+            #         for dr, dc in directions:
+            #             new_row, new_col = curr_row + dr, curr_col + dc
+            #             if 0 <= new_row < self.nrows and 0 <= new_col < self.ncols:
+            #                 queue.append((new_row, new_col))
+
+            for i in range(len(self.board)):
+                if i not in self.solved:
+                    tile_value = self.get_tile(self.board[i]["coord"])
+                    self.board[i]["value"] = tile_value
+                    if tile_value.isdigit():
+                        self.solved.add(i)
 
         self.print_board()
 
