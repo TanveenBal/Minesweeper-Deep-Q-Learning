@@ -9,9 +9,9 @@ CONFIDENCES = {
     "unsolved": 0.99,
     "mine": 0.99,
     "0": 0.99,
-    "1": 0.90,
-    "2": 0.90,
-    "3": 0.80,
+    "1": 0.95,
+    "2": 0.95,
+    "3": 0.85,
     "4": 0.90,
     "5": 0.90,
     "6": 0.90,
@@ -131,6 +131,8 @@ class MinesweeperAgentWeb(object):
         
         tile_value = self.get_tile(action_coords)
         self.board[action_index]["value"] = tile_value
+        if tile_value.isdigit() and int(tile_value) > 3:
+            print("YAY")
 
         
         if tile_value == "0": # Can make this bfs instead of what it does right now, basically bfs until there are unsolveds for effeciency
@@ -168,15 +170,8 @@ class MinesweeperAgentWeb(object):
                             if 0 <= new_row < self.nrows and 0 <= new_col < self.ncols:
                                 if (new_row, new_col) not in visited:
                                     queue.append((new_row, new_col))
-
-            # for i in range(len(self.board)):
-            #     if i not in self.solved:
-            #         tile_value = self.get_tile(self.board[i]["coord"])
-            #         self.board[i]["value"] = tile_value
-            #         if tile_value.isdigit():
-            #             self.solved.add(i)
-
             self.board = self.board.ravel()
+
         self.print_board()
 
     def print_board(self):
