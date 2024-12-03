@@ -6,10 +6,11 @@ EPSILON = 0.01
 
 CONFIDENCES = {
     "unsolved": 0.99,
+    "mine": .80,
     "0": 0.99,
     "1": 0.95,
     "2": 0.95,
-    "3": 0.88,
+    "3": 0.80,
     "4": 0.95,
     "5": 0.95,
     "6": 0.95,
@@ -17,16 +18,31 @@ CONFIDENCES = {
     "8": 0.95
 }
 
+# TILES = {
+#     "U": "unsolved",
+#     "0": "0",
+#     "1": "1",
+#     "2": "2",
+#     "3": "3",
+#     "4": "4"
+# }
+
+# TILES2 = {
+#     "5": "5",
+#     "6": "6",
+#     "7": "7",
+#     "8": "8",
+# }
+
+
 TILES = {
     "U": "unsolved",
+    "M": "mine",
     "0": "0",
     "1": "1",
     "2": "2",
     "3": "3",
-    "4": "4"
-}
-
-TILES2 = {
+    "4": "4",
     "5": "5",
     "6": "6",
     "7": "7",
@@ -41,14 +57,36 @@ class MinesweeperAgentWeb(object):
         self.mode, self.loc, self.dims = self.get_loc()
         self.nrows, self.ncols = self.dims[0], self.dims[1]
         self.ntiles = self.dims[2]
-        self.board = self.get_board(self.loc)
-        self.state = self.get_state(self.board)
+        self.board = self.get_board()
+        self.state = self.get_state()
 
         self.epsilon = EPSILON
         self.model = model
+        self.done = False
 
     def reset(self):
         pg.press("f2")
+
+    def random_move(self):
+        """
+        Performs a random move by selecting a random unsolved tile.
+        Updates the board after the move.
+        """
+        unsolved_tiles = []
+        for i, tile in enumerate(self.board):
+            if tile["value"] == "U":
+                unsolved_tiles.append(i)
+
+        if not unsolved_tiles:
+            return
+        
+        random_index = np.random.choice(len(unsolved_tiles))
+
+        # Perform the click action on the selected tile
+        pg.click(self.board[random_index]["coord"])
+
+        # Update the board after the move using the selected row and col
+        self.board =  self.get_board()
 
     def get_loc(self):
         """
@@ -87,23 +125,36 @@ class MinesweeperAgentWeb(object):
 
         return tiles
 
-    def get_board(self, bbox):
+    def get_board(self):
         """
         Gets the state of the board as a dictionary of coordinates and values,
         ordered from left to right, top to bottom
         """
 
-        all_tiles = [[t, self.get_tiles(TILES[t], self.loc)] for t in TILES]
+        # all_tiles = [[t, self.get_tiles(TILES[t], self.loc)] for t in TILES]
 
-        # for speedup; look for higher tiles only if n of lower tiles < total ----
-        count=0
-        for value, coords in all_tiles:
-            count += len(coords)
+        # # for speedup; look for higher tiles only if n of lower tiles < total ----
+        # count=0
+        # for value, coords in all_tiles:
+        #     count += len(coords)
 
-        if count < self.ntiles:
-            higher_tiles = [[t, self.get_tiles(TILES2[t], self.loc)] for t in TILES2]
-            all_tiles += higher_tiles
-        # ----
+        # if count < self.ntiles:
+        #     higher_tiles = [[t, self.get_tiles(TILES2[t], self.loc)] for t in TILES2]
+        #     all_tiles += higher_tiles
+        # # ----
+
+        # tiles = []
+        # for value, coords in all_tiles:
+        #     for coord in coords:
+        #         tiles.append({"coord": (coord[0], coord[1]), "value": value})
+
+        # tiles = sorted(tiles, key=lambda x: (x["coord"][1], x["coord"][0]))
+
+        self.check_game_over()
+        if self.done:
+            return
+
+        all_tiles = [[tile, self.get_tiles(TILES[tile], self.loc)] for tile in TILES]
 
         tiles = []
         for value, coords in all_tiles:
@@ -112,21 +163,25 @@ class MinesweeperAgentWeb(object):
 
         tiles = sorted(tiles, key=lambda x: (x["coord"][1], x["coord"][0]))
 
-        i=0
-        for x in range(self.nrows):
-            for y in range(self.ncols):
-                tiles[i]["index"] = (y, x)
-                i+=1
+        try:
+            i=0
+            for x in range(self.nrows):
+                for y in range(self.ncols):
+                    tiles[i]["index"] = (y, x)
+                    i+=1
+
+        except IndexError:
+            print(len(tiles))
 
         return tiles
 
-    def get_state(self, board):
+    def get_state(self):
         """
         Gets the numeric image representation state of the board.
         This is what will be the input for the DQN.
         """
 
-        state_im = [t["value"] for t in board]
+        state_im = [t["value"] for t in self.board]
         state_im = np.reshape(state_im, (self.nrows, self.ncols, 1)).astype(object)
 
         state_im[state_im=="U"] = -1
@@ -137,7 +192,7 @@ class MinesweeperAgentWeb(object):
 
         return state_im
 
-    def get_action(self, state):
+    def get_action(self):
         board = self.state.reshape(1, self.ntiles)
         unsolved = [i for i, x in enumerate(board[0]) if x==-0.125]
 
@@ -157,7 +212,7 @@ class MinesweeperAgentWeb(object):
         board_2d = np.reshape(board_2d, (self.nrows, self.ncols))
 
         tile = self.board[action_index]["index"]
-        x,y = tile[0], tile[1]
+        x, y = tile[0], tile[1]
 
         neighbors = []
         for col in range(y-1, y+2):
@@ -176,34 +231,36 @@ class MinesweeperAgentWeb(object):
         #self.n_solved = self.n_solved_
 
         # get neighbors before clicking
-        neighbors = self.get_neighbors(action_index)
+        # neighbors = self.get_neighbors(action_index)
 
-        done = self.check_game_over
-
+        self.check_game_over()
+        
         pg.click(self.board[action_index]["coord"])
+        pg.click((10,100))
+        
 
-        if not done:
-            self.board = self.get_board(self.loc)
-            self.state = self.get_state(self.board)
+        if not self.done:
+            self.board = self.get_board()
+            self.state = self.get_state()
 
-        return self.state, done
+        return self.state, self.done
 
     def check_game_over(self):
         """
         Check if the game is won or lost.
         """
         try:
-            if pg.locateOnScreen(f"game_state/lost.png", region=self.loc, confidence=0.8):
+            if pg.locateOnScreen(f"pics/lost.png", region=self.loc, confidence=0.99):
                 print("Game Over: Lost")
-                return True
+                self.done = True
         except pg.ImageNotFoundException:
             pass
 
         try:
-            if pg.locateOnScreen(f"game_state/won.png", region=self.loc, confidence=0.8):
+            if pg.locateOnScreen(f"pics/won.png", region=self.loc, confidence=0.99):
                 print("Game Over: Won")
-                return True
+                self.done = True
         except pg.ImageNotFoundException:
             pass
 
-        return False
+        self.done = False

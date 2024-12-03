@@ -3,15 +3,17 @@ import numpy as np
 import pandas as pd
 
 class MinesweeperEnv(object):
-    def __init__(self, width, height, n_mines,
-        # based on https://github.com/jakejhansen/minesweeper_solver
-        rewards={'win':1, 'lose':-1, 'progress':0.3, 'guess':-0.3, 'no_progress' : -0.3}):
+    def __init__(self, width, height, n_mines, 
+                 rewards={'win':1, 'lose':-1, 'progress':0.3, 'guess':-0.3, 'no_progress' : -0.3}):
+                 # based on https://github.com/jakejhansen/minesweeper_solver
         self.nrows, self.ncols = width, height
         self.ntiles = self.nrows * self.ncols
         self.n_mines = n_mines
         self.grid = self.init_grid()
         self.board = self.get_board()
         self.state, self.state_im = self.init_state()
+        self.flagged_cells = set()
+        self.uncovered_cells = set()
         self.n_clicks = 0
         self.n_progress = 0
         self.n_wins = 0
@@ -135,6 +137,8 @@ class MinesweeperEnv(object):
         else:
             # make state equal to board at given coordinates
             self.state[action_index]['value'] = value
+        
+        self.uncovered_cells.add(coord) 
 
         # reveal all neighbors if value is 0
         if value == 0.0:
@@ -184,6 +188,9 @@ class MinesweeperEnv(object):
 
         self.click(action_index)
 
+        # Evaluate the board for guaranteed moves
+        self.evaluate_board()
+
         # update state image
         new_state_im = self.get_state_im(self.state)
         self.state_im = new_state_im
@@ -210,3 +217,40 @@ class MinesweeperEnv(object):
                 self.n_progress += 1 # track n of non-isoloated clicks
 
         return self.state_im, reward, done
+
+    def evaluate_board(self):
+        for (x, y), value in np.ndenumerate(self.board):
+            if (x, y) in self.uncovered_cells and value != 'U':
+                self.all_safe((x, y))
+                self.all_mines((x, y))
+                
+    def effective_label(self, cell):
+        cell_value = self.board[cell[0], cell[1]]
+        if isinstance(cell_value, (int, float)):
+            neighbors = self.get_neighbors(cell)
+            flagged_neighbors = [n for n in neighbors if n in self.flagged_cells]
+            return cell_value - len(flagged_neighbors)
+
+    def all_safe(self, cell):
+        if self.effective_label(cell) == 0:
+            neighbors = self.get_neighbors(cell)
+            for neighbor in neighbors:
+                if neighbor not in self.uncovered_cells and neighbor not in self.flagged_cells:
+                    self.uncover_cell(neighbor)  # Uncover safe cell
+
+    def all_mines(self, cell):
+        neighbors = self.get_neighbors(cell)
+        uncovered_neighbors = [n for n in neighbors if n not in self.uncovered_cells]
+
+        if len(uncovered_neighbors) == self.effective_label(cell):
+            for neighbor in uncovered_neighbors:
+                self.flag_cell(neighbor)  # Flag mine
+
+    def uncover_cell(self, cell):
+        action_index = next(idx for idx, t in enumerate(self.state) if t['coord'] == cell)
+        self.click(action_index)  # Simulate a click
+
+    def flag_cell(self, cell):
+        self.flagged_cells.add(cell)  # Mark the cell as flagged
+        # Optionally: update the state or visualization if needed
+    

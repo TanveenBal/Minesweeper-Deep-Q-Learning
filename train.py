@@ -16,19 +16,17 @@ def parse_args():
                         help='Number of mines on the board')
     parser.add_argument('--episodes', type=int, default=100_000,
                         help='Number of episodes to train on')
-    parser.add_argument('--model_name', type=str, default=f'{MODEL_NAME}',
-                        help='Name of model')
 
     return parser.parse_args()
 
 params = parse_args()
 
 AGG_STATS_EVERY = 100 # calculate stats every 100 games for tensorboard
-SAVE_MODEL_EVERY = 10_000 # save model and replay every 10,000 episodes
+SAVE_MODEL_EVERY = 1000 # save model and replay every 10,000 episodes
 
 def main():
     env = MinesweeperEnv(params.width, params.height, params.n_mines)
-    agent = DQNAgent(env, params.model_name)
+    agent = DQNAgent(env, MODEL_NAME)
 
     progress_list, wins_list, ep_rewards = [], [], []
     n_clicks = 0
@@ -80,11 +78,16 @@ def main():
 
             print(f'Episode: {episode}, Median progress: {med_progress}, Median reward: {med_reward}, Win rate : {win_rate}')
 
-        if not episode % SAVE_MODEL_EVERY:
-            with open(f'replay/{MODEL_NAME}.pkl', 'wb') as output:
-                pickle.dump(agent.replay_memory, output)
-
-            agent.model.save(f'models/{MODEL_NAME}.h5')
+            if not episode % SAVE_MODEL_EVERY:
+                os.makedirs('replay', exist_ok=True)  # Ensure directory exists
+                try:
+                    with open(f'replay/{MODEL_NAME}.pkl', 'wb') as output:
+                        pickle.dump(agent.replay_memory, output)
+                    
+                    # Save model using the native Keras format
+                    agent.model.save(f'models/{MODEL_NAME}.keras')
+                except Exception as e:
+                    print(f"Error saving model or replay memory: {e}")
 
 if __name__ == "__main__":
     main()
