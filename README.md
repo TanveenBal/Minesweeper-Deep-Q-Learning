@@ -2,11 +2,13 @@
 
 This is different from just simply training a model on minesweeper through trial and error. As most people know, there are guaranteed moves for a player to make while playing the game. These rules are added on top of the model to make for guaranteed moves.
 
-<center>
-  <img src="src/8x8.gif" alt="Pong" style="margin: 0 10px;">
-  <img src="src/16x16.gif" alt="Pong 16x16" style="margin: 0 10px;">
-  <img src="src/16x30.gif" alt="Pong 16x30" style="margin: 0 10px;">
-</center>
+<table align="center">
+  <tr>
+    <td><img src="src/8x8.gif" alt="Pong"></td>
+    <td><img src="src/16x16.gif" alt="Pong 16x16"></td>
+    <td><img src="src/16x30.gif" alt="Pong 16x30"></td>
+  </tr>
+</table>
 
 ## Table of Contents
 1. [Introduction to Minesweeper](#intro)
