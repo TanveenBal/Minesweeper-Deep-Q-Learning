@@ -339,5 +339,5 @@ def check_game_over(self):
 
 
 Found something wrong in my code or have questions? Feel free to contact me:
-- tanveenbal@gmail.com
-- [my linkedin](https://www.linkedin.com/in/tanveenbal/)
+- Email: [tanveenbal@gmail.com](tanveenbal@gmail.com)
+- LinkedIn: [tanveenbal](https://www.linkedin.com/in/tanveenbal/)
