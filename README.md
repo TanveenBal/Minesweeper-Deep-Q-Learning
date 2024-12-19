@@ -1,6 +1,6 @@
 ## I created an AI to play minesweeper for you!
 
-This is different from just simply training a model on minesweeper through trial and error. As most people know, there are garunteed moves for a player to make while playing the game. These rules are added on top of the model to make for garunteed moves.
+This is different from just simply training a model on minesweeper through trial and error. As most people know, there are guaranteed moves for a player to make while playing the game. These rules are added on top of the model to make for guaranteed moves.
 
 <p align="center">
   <img src="src/8x8.gif" alt="Pong">
