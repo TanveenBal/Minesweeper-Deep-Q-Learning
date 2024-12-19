@@ -1,19 +1,17 @@
 import random
 import numpy as np
 import pandas as pd
+from collections import deque
 
 class MinesweeperEnv(object):
-    def __init__(self, width, height, n_mines, 
-                 rewards={'win':1, 'lose':-1, 'progress':0.3, 'guess':-0.3, 'no_progress' : -0.3}):
-                 # based on https://github.com/jakejhansen/minesweeper_solver
+    def __init__(self, width, height, n_mines,
+        rewards={'win':1, 'lose':-1, 'progress':0.3, 'guess':-0.3, 'no_progress' : -0.3}):
         self.nrows, self.ncols = width, height
         self.ntiles = self.nrows * self.ncols
         self.n_mines = n_mines
         self.grid = self.init_grid()
         self.board = self.get_board()
         self.state, self.state_im = self.init_state()
-        self.flagged_cells = set()
-        self.uncovered_cells = set()
         self.n_clicks = 0
         self.n_progress = 0
         self.n_wins = 0
@@ -68,25 +66,21 @@ class MinesweeperEnv(object):
         Gets the numeric image representation state of the board.
         This is what will be the input for the DQN.
         '''
+        state_im = np.full((self.nrows, self.ncols), '-1.0', dtype='float32')
 
-        state_im = [t['value'] for t in state]
-        state_im = np.reshape(state_im, (self.nrows, self.ncols, 1)).astype(object)
-
-        state_im[state_im=='U'] = -1
-        state_im[state_im=='B'] = -2
-
-        state_im = state_im.astype(np.int8) / 8
-        state_im = state_im.astype(np.float16)
+        for row in range(self.nrows):
+            for col in range(self.ncols):
+                value = state[row, col]
+                if value == "U":
+                    value = -1
+                elif value == "B":
+                    value = -2
+                state_im[row][col] = np.float32(value / 8)
 
         return state_im
 
     def init_state(self):
-        unsolved_array = np.full((self.nrows, self.ncols), 'U', dtype='object')
-
-        state = []
-        for (x, y), value in np.ndenumerate(unsolved_array):
-            state.append({'coord': (x, y), 'value':value})
-
+        state = np.full((self.nrows, self.ncols), 'U', dtype='object')
         state_im = self.get_state_im(state)
 
         return state, state_im
@@ -123,52 +117,55 @@ class MinesweeperEnv(object):
 
         display(state_df.style.applymap(self.color_state))
 
-    def click(self, action_index):
-        coord = self.state[action_index]['coord']
+    def click(self, row, col):
+        # Convert action index to 2D coordinates
+        coord = (row, col)
+
         value = self.board[coord]
 
-        # ensure first move is not a bomb
-        if (value == 'B') and (self.n_clicks == 0):
-            grid = self.grid.reshape(1, self.ntiles)
-            move = np.random.choice(np.nonzero(grid!='B')[1])
-            coord = self.state[move]['coord']
-            value = self.board[coord]
-            self.state[move]['value'] = value
-        else:
-            # make state equal to board at given coordinates
-            self.state[action_index]['value'] = value
-        
-        self.uncovered_cells.add(coord) 
+        # Ensure the first move is not a bomb
+        if value == 'B' and self.n_clicks == 0:
+            # Pick a random safe tile
+            while value == 'B':
+                random_row = random.randint(0, self.nrows - 1)
+                random_col = random.randint(0, self.ncols - 1)
+                coord = (random_row, random_col)
+                value = self.board[coord]
 
-        # reveal all neighbors if value is 0
-        if value == 0.0:
-            self.reveal_neighbors(coord, clicked_tiles=[])
+        # Update state with the clicked value
+        self.state[coord] = value
+
+        # Reveal neighbors if the clicked value is 0
+        if value == 0:
+            self.reveal_neighbors(coord)
 
         self.n_clicks += 1
 
-    def reveal_neighbors(self, coord, clicked_tiles):
-        processed = clicked_tiles
-        state_df = pd.DataFrame(self.state)
-        x,y = coord[0], coord[1]
+    def reveal_neighbors(self, coord):
+        visited = set()
+        queue = deque()
+        queue.append(coord)
+        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
-        neighbors = []
-        for col in range(y-1, y+2):
-            for row in range(x-1, x+2):
-                if ((x != row or y != col) and
-                    (0 <= col < self.ncols) and
-                    (0 <= row < self.nrows) and
-                    ((row, col) not in processed)):
+        while queue:
+            curr_row, curr_col = queue.popleft()
 
-                    # prevent redundancy for adjacent zeros
-                    processed.append((row,col))
+            # Skip if already visited
+            if (curr_row, curr_col) in visited:
+                continue
 
-                    index = state_df.index[state_df['coord'] == (row,col)].tolist()[0]
+            visited.add((curr_row, curr_col))
 
-                    self.state[index]['value'] = self.board[row, col]
+            self.state[curr_row, curr_col] = self.board[curr_row, curr_col]
 
-                    # recursion in case neighbors are also 0
-                    if self.board[row, col] == 0.0:
-                        self.reveal_neighbors((row, col), clicked_tiles=processed)
+            if self.board[curr_row, curr_col] == 0:
+                for dr, dc in directions:
+                    adj_row, adj_col = curr_row + dr, curr_col + dc
+                    
+                    if 0 <= adj_row < self.nrows and 0 <= adj_col < self.ncols:
+                        if (adj_row, adj_col) not in visited:
+                            queue.append((adj_row, adj_col))
+
 
     def reset(self):
         self.n_clicks = 0
@@ -177,93 +174,40 @@ class MinesweeperEnv(object):
         self.board = self.get_board()
         self.state, self.state_im = self.init_state()
 
-    def step(self, action_index):
+    
+    def step(self, row, col):
         done = False
-        coords = self.state[action_index]['coord']
 
-        current_state = self.state_im
+        # Get the coordinates from the action index
+        coord = (row, col)
 
-        # get neighbors before action
-        neighbors = self.get_neighbors(coords)
+        current_state = self.state_im.copy()
 
-        self.click(action_index)
+        # Click the tile
+        self.click(row, col)
 
-        # Evaluate the board for guaranteed moves
-        # evaluating = True
-        # while evaluating:
-        #     evaluating = self.evaluate_board()
-
-        # update state image
         new_state_im = self.get_state_im(self.state)
         self.state_im = new_state_im
 
-        if self.state[action_index]['value']=='B': # if lose
+        if self.state[coord] == 'B':  # Lose condition
             reward = self.rewards['lose']
             done = True
 
-        elif np.sum(new_state_im==-0.125) == self.n_mines: # if win
+        elif np.sum(new_state_im == -0.125) == self.n_mines:  # Win condition
             reward = self.rewards['win']
             done = True
             self.n_progress += 1
             self.n_wins += 1
 
-        elif np.sum(self.state_im == -0.125) == np.sum(current_state == -0.125):
+        elif np.sum(new_state_im == -0.125) == np.sum(current_state == -0.125):  # No progress
             reward = self.rewards['no_progress']
 
-        else: # if progress
-            if all(t==-0.125 for t in neighbors): # if guess (all neighbors are unsolved)
+        else:  # Progress condition
+            neighbors = self.get_neighbors(coord)
+            if all(t==-0.125 for t in neighbors):
                 reward = self.rewards['guess']
-
             else:
                 reward = self.rewards['progress']
-                self.n_progress += 1 # track n of non-isoloated clicks
+                self.n_progress += 1  # Track number of non-isolated clicks
 
         return self.state_im, reward, done
-
-    # def evaluate_board(self):
-    #     evaluated = False
-    #     for (x, y), value in np.ndenumerate(self.board):
-    #         if (x, y) in self.uncovered_cells and value != 'U':
-    #             safe = self.all_safe((x, y))
-    #             mines = self.all_mines((x, y))
-    #             evaluated = evaluated or safe or mines
-
-    #     return evaluated
-                
-    # def effective_label(self, cell):
-    #     cell_value = self.board[cell[0], cell[1]]
-    #     if isinstance(cell_value, (int, float)):
-    #         neighbors = self.get_neighbors(cell)
-    #         flagged_neighbors = [n for n in neighbors if n in self.flagged_cells]
-    #         return cell_value - len(flagged_neighbors)
-
-    # def all_safe(self, cell):
-    #     safe = False
-    #     if self.effective_label(cell) == 0:
-    #         neighbors = self.get_neighbors(cell)
-    #         for neighbor in neighbors:
-    #             if neighbor not in self.uncovered_cells and neighbor not in self.flagged_cells:
-    #                 self.uncover_cell(neighbor)  # Uncover safe cell
-    #                 safe = True
-    #     return safe
-
-    # def all_mines(self, cell):
-    #     mines = False
-    #     neighbors = self.get_neighbors(cell)
-    #     uncovered_neighbors = [n for n in neighbors if n not in self.uncovered_cells]
-
-    #     if len(uncovered_neighbors) == self.effective_label(cell):
-    #         for neighbor in uncovered_neighbors:
-    #             self.flag_cell(neighbor) 
-    #             mines = True
-
-    #     return mines
-
-    # def uncover_cell(self, cell):
-    #     action_index = next(idx for idx, t in enumerate(self.state) if t['coord'] == cell)
-    #     self.click(action_index)  # Simulate a click
-
-    # def flag_cell(self, cell):
-    #     self.flagged_cells.add(cell)  # Mark the cell as flagged
-    #     # Optionally: update the state or visualization if needed
-    
