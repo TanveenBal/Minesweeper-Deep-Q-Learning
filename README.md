@@ -22,7 +22,7 @@ Minesweeper is a classic logic-based puzzle game that has been captivating playe
 
 **Is it possible for a computer to beat minesweeper?**
 
-Of course, it's possible—but how exactly can it be done? While Minesweeper’s logical rules make it solvable through algorithms based on if-else conditions, the true challenge comes from teaching a computer to play the game with an evolving understanding. In this project, we do more than just rely on a machine learning model that learns from trial and error. Instead, the system is enhanced with built-in game rules—those guaranteed moves players can make based on number clues—allowing the AI to leverage known strategies alongside its learned decision-making. This combination of learned moves and guaranteed strategies pushes the boundaries of how an AI can approach Minesweeper.
+Of course, it's possible—but how exactly can it be done? While Minesweeper’s logical rules make it solvable through algorithms based on if-else conditions, the true challenge comes from teaching a computer to play the game with an evolving understanding. In this project, I do more than just rely on a machine learning model that learns from trial and error. Instead, the system is enhanced with built-in game rules—those guaranteed moves players can make based on number clues—allowing the AI to leverage known strategies alongside its learned decision-making. This combination of learned moves and guaranteed strategies pushes the boundaries of how an AI can approach Minesweeper.
 
 This is where Reinforcement Learning steps in!
 
@@ -233,7 +233,7 @@ def get_tile(self, coords):
     return "M"
 ```
 
-A complication occurs when updating the board. If the tile is `empty` we need to cascade and know the values of the tiles adjacent to the `empty` tile. This is done effeciently using Breath First Search `BFS`:
+A complication occurs when updating the board. If the tile is `empty` I need to cascade and know the values of the tiles adjacent to the `empty` tile. This is done effeciently using Breath First Search `BFS`:
 ```python
     def update_board(self, action_index, action_coords):
         """
