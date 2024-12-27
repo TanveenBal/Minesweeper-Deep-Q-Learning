@@ -204,6 +204,15 @@ def get_action(self, state):
 - The epsilon-greedy strategy balances exploration (random moves) and exploitation (using the model’s learned predictions).
 - The model focuses on solving only unsolved tiles by applying masking on previously revealed ones to avoid unnecessary actions.
 
+### Winarate and Reward Statistics
+These two graphs show the winrate and reward median acheived when running the model. The top one corresponds to winrate and bottom one is the reward median.
+<div style="text-align: center;">
+<img src="src/winrate.png">
+</div>
+<div style="text-align: center;">
+<img src="src/reward_median.png">
+</div>
+
 ### Computer Vision Integration with PyAutoGUI
 
 To control the Minesweeper board, the agent uses the `PyAutoGUI` library for mouse control and screen reading. The board is detected using predefined screenshots of tile types (e.g., unsolved, flagged, mine) to extract coordinates of each tile:
